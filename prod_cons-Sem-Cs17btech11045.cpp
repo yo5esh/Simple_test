@@ -18,6 +18,13 @@
 #include<string.h>
 #include<random>
 #include<sys/time.h>
+#include<chrono>
+#include<ratio>
+#include<ctime>
+#include<fstream>
+#include<mutex>
+#include<string>
+#include<time.h>
 
 #define BUFFER_SIZE 4
 #define FULL 0
@@ -29,8 +36,12 @@ std::default_random_engine generator;
 int buffer[BUFFER_SIZE];
 
 
+
 int np, nc, t1, t2, p, c;
 sem_t empty,full;
+
+int sem_destroy(sem_t *sem);
+
 /**
  * Defining empty for Producer semaphore. 
  * Defining full for  Consumer Semaphore.
@@ -43,22 +54,29 @@ int out = 0;
 void *Producer(void *param);
 void *Consumer(void *param);
 
-typedef unsigned long long timestamp_t;
+typedef string  timestamp_t;
 static timestamp_t 
+
 
 get_timestamp()
 {
-   struct timeval now;
-   gettimeofday (&now, NULL);
-   return now.tv_usec+(timestamp_t) now.tv_sec/1000000;
+    time_t     now = time(0);
+    struct tm  tstruct;
+    char  buff[80];
+    tstruct = *localtime(&now);
+    // Visit http://en.cppreference.com/w/cpp/chrono/c/strftime
+    // for more information about date/time format
+    strftime(buff, sizeof(buff), " %X", &tstruct);
 
+    return buff;
 }
+
 
 int main()
 { 
     ifstream r; /// stream class to Read from file.
     fstream wr; /// stream class to Write on file.
-    r.open("in-params2.txt");
+    r.open("in-params.txt");
     r>>np>>nc>>t1>>t2>>p>>c;
 
     pthread_t tp[np];
@@ -85,7 +103,7 @@ int main()
          pthread_create(&tc[i],&attr,Consumer,NULL);
      }
      /// Joining threads 
-     for(int i= ;i<=np;i++)
+     for(int i=1;i<=np;i++)
      {
          pthread_join(tp[i], NULL);
      }
@@ -94,8 +112,13 @@ int main()
          pthread_join(tc[i], NULL);
      }
      
+
+    sem_destroy(&empty);
+    sem_destroy(&full);
+ 
     pthread_exit(NULL);
-     return 0;
+
+     return 1;
 
 }
 
@@ -103,6 +126,9 @@ void *Producer( void *param)
 {
  int i,item;
  
+ item = 0;
+ int  m = 0;
+
  timestamp_t t0;
 
  for(int i=0;i<np;i++)
@@ -113,15 +139,19 @@ void *Producer( void *param)
      */
     buffer[in] = item;
     in = (in+1)%BUFFER_SIZE;
+   
+   item = item+1;
+   m = m+1;
 
     t0 = get_timestamp();
 
-    cout<<i<<"  th item  "<<item<<" produced by thread at id  Into Buffer "<<t0<<" location "<<endl;//<<m;
+    cout<<i<<"  th item  "<<item<<" produced by thread at id  Into Buffer "<<t0<<" location "<<m<<endl;//<<m;
     if(in==FULL)
       sem_post(&full);
         sleep(1);
     
    sem_post(&empty);
+   
  }
 }
 
@@ -129,6 +159,8 @@ void *Consumer(void *param)
 {  
     int i,item;
     
+    item = 0;
+    int m = 0;
     timestamp_t t1;
     for(int i=0;i<nc;i++)
     {
@@ -136,8 +168,12 @@ void *Consumer(void *param)
         
         item  = buffer[out];
         out = (out+1)%BUFFER_SIZE;
+
+         item = item+1;
+         m = m+1;
         t1 = get_timestamp();
-        cout<< i << " th item " << item << " Consumed by thread at " <<t1<< " Into Buffer location  "<<endl;//<< m;
+
+        cout<< i << " th item " << item << " Consumed by thread at " <<t1<< " Into Buffer location  "<<m<<endl;//<< m;
         if(out == EMPTY)
             sleep(1);
 
